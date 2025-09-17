@@ -51,7 +51,8 @@ def generate_thumbnail(
             model=config.MODEL_IMAGE,
             prompt=f"{prompt}\n\n이 이미지를 참고하여 1:1 정사각형 비율의 깨끗한 누끼컷 이미지를 생성해주세요.",
             n=1,
-            size="1024x1024"
+            size="1024x1024",
+            quality="high"
         )
         
         # gpt-image-1 응답 처리
@@ -142,7 +143,8 @@ def generate_styled_shot(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
+                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                quality="high"
             )
             
             # 생성된 이미지 처리
@@ -237,7 +239,8 @@ def generate_wear_shot(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
+                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                quality="high"
             )
             
             # 생성된 이미지 처리
@@ -332,7 +335,8 @@ def generate_wear_closeup(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
+                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                quality="high"
             )
             
             # 생성된 이미지 처리
