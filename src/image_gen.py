@@ -142,17 +142,41 @@ def generate_styled_shot(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1792"  # 3:4에 가까운 비율
+                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
             )
             
-            # 생성된 이미지 다운로드
+            # 생성된 이미지 처리
             import requests
             from PIL import Image as PILImage
             from io import BytesIO
             
-            image_url = response.data[0].url
-            image_response = requests.get(image_url)
-            generated_image = PILImage.open(BytesIO(image_response.content))
+            # 응답 확인
+            if hasattr(response, 'data') and response.data:
+                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                    # base64 데이터 처리
+                    logger.info("base64 형식의 이미지 데이터 처리 중")
+                    b64_data = response.data[0].b64_json
+                    
+                    # 'data:image/png;base64,' 프리픽스 제거
+                    if b64_data.startswith('data:image/'):
+                        b64_data = b64_data.split(',')[1]
+                    
+                    # base64 디코딩
+                    image_data = base64.b64decode(b64_data)
+                    generated_image = PILImage.open(BytesIO(image_data))
+                elif hasattr(response.data[0], 'url') and response.data[0].url:
+                    # URL에서 이미지 다운로드
+                    logger.info("URL에서 이미지 다운로드 중")
+                    image_url = response.data[0].url
+                    image_response = requests.get(image_url)
+                    generated_image = PILImage.open(BytesIO(image_response.content))
+                else:
+                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
+                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            else:
+                logger.error(f"응답 형식 오류: {response}")
+                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
+                
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 연출컷 {i+1} 생성 성공")
@@ -213,17 +237,41 @@ def generate_wear_shot(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1792"  # 3:4에 가까운 비율
+                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
             )
             
-            # 생성된 이미지 다운로드
+            # 생성된 이미지 처리
             import requests
             from PIL import Image as PILImage
             from io import BytesIO
             
-            image_url = response.data[0].url
-            image_response = requests.get(image_url)
-            generated_image = PILImage.open(BytesIO(image_response.content))
+            # 응답 확인
+            if hasattr(response, 'data') and response.data:
+                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                    # base64 데이터 처리
+                    logger.info("base64 형식의 이미지 데이터 처리 중")
+                    b64_data = response.data[0].b64_json
+                    
+                    # 'data:image/png;base64,' 프리픽스 제거
+                    if b64_data.startswith('data:image/'):
+                        b64_data = b64_data.split(',')[1]
+                    
+                    # base64 디코딩
+                    image_data = base64.b64decode(b64_data)
+                    generated_image = PILImage.open(BytesIO(image_data))
+                elif hasattr(response.data[0], 'url') and response.data[0].url:
+                    # URL에서 이미지 다운로드
+                    logger.info("URL에서 이미지 다운로드 중")
+                    image_url = response.data[0].url
+                    image_response = requests.get(image_url)
+                    generated_image = PILImage.open(BytesIO(image_response.content))
+                else:
+                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
+                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            else:
+                logger.error(f"응답 형식 오류: {response}")
+                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
+                
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 착용컷 {i+1} 생성 성공")
@@ -284,17 +332,41 @@ def generate_wear_closeup(
                 model=config.MODEL_IMAGE,
                 prompt=variation_prompt,
                 n=1,
-                size="1024x1792"  # 3:4에 가까운 비율
+                size="1024x1536"  # 2:3 비율 (GPT-4 지원)
             )
             
-            # 생성된 이미지 다운로드
+            # 생성된 이미지 처리
             import requests
             from PIL import Image as PILImage
             from io import BytesIO
             
-            image_url = response.data[0].url
-            image_response = requests.get(image_url)
-            generated_image = PILImage.open(BytesIO(image_response.content))
+            # 응답 확인
+            if hasattr(response, 'data') and response.data:
+                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                    # base64 데이터 처리
+                    logger.info("base64 형식의 이미지 데이터 처리 중")
+                    b64_data = response.data[0].b64_json
+                    
+                    # 'data:image/png;base64,' 프리픽스 제거
+                    if b64_data.startswith('data:image/'):
+                        b64_data = b64_data.split(',')[1]
+                    
+                    # base64 디코딩
+                    image_data = base64.b64decode(b64_data)
+                    generated_image = PILImage.open(BytesIO(image_data))
+                elif hasattr(response.data[0], 'url') and response.data[0].url:
+                    # URL에서 이미지 다운로드
+                    logger.info("URL에서 이미지 다운로드 중")
+                    image_url = response.data[0].url
+                    image_response = requests.get(image_url)
+                    generated_image = PILImage.open(BytesIO(image_response.content))
+                else:
+                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
+                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            else:
+                logger.error(f"응답 형식 오류: {response}")
+                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
+                
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 클로즈업 착용컷 {i+1} 생성 성공")
