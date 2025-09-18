@@ -91,15 +91,21 @@ def create_output_dir(output_dir: Optional[str], task_type: str) -> Path:
     return out_path
 
 
-def save_image(img: Image.Image, output_path: Path, format: str = "PNG") -> None:
+def save_image(img: Image.Image, output_path: Path, format: str = None) -> None:
     """이미지 저장"""
+    # 파일 확장자로 포맷 자동 감지
+    if format is None:
+        ext = output_path.suffix.lower()
+        format_map = {'.jpg': 'JPEG', '.jpeg': 'JPEG', '.png': 'PNG', '.webp': 'WEBP', '.bmp': 'BMP'}
+        format = format_map.get(ext, 'PNG')
+    
     if format.upper() == "JPEG" and img.mode in ('RGBA', 'LA', 'P'):
         # JPEG는 알파 채널을 지원하지 않음
         rgb_img = Image.new('RGB', img.size, (255, 255, 255))
         rgb_img.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
         img = rgb_img
     
-    img.save(output_path, format=format, quality=95 if format == "JPEG" else None)
+    img.save(output_path, format=format, quality=100 if format == "JPEG" else None)
     logger.info(f"이미지 저장: {output_path}")
 
 
