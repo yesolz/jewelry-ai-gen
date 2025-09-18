@@ -73,6 +73,42 @@ out/
         └── wear_closeup_3x4_01.png   # 클로즈업
 ```
 
+### 6. 일괄 생성 (전체 프로세스 한번에 실행)
+
+#### Python 스크립트 사용
+```bash
+# 기본 사용법 (상품 설명, 제품 연출컷, 착용컷, 클로즈업 착용컷 모두 생성)
+python generate_all.py --image samples/necklace.png --type necklace
+
+# 출력 디렉토리 지정
+python generate_all.py --image samples/ring.jpg --type ring --out out/my_ring
+
+# 상품 설명 생성 건너뛰기
+python generate_all.py --image samples/bracelet.jpg --type bracelet --skip-desc
+```
+
+#### Bash 스크립트 사용
+```bash
+# 기본 사용법
+./generate_all.sh samples/necklace.png necklace
+
+# 출력 디렉토리 지정
+./generate_all.sh samples/ring.jpg ring out/my_ring
+```
+
+생성되는 디렉토리 구조:
+```
+out/necklace_necklace_all/
+├── desc/           # 상품 설명
+│   └── description.txt
+├── styled/         # 제품 연출컷
+│   └── styled_3x4_01.jpg
+├── wear/           # 착용컷
+│   └── wear_3x4_01.jpg
+└── closeup/        # 클로즈업 착용컷
+    └── wear_closeup_3x4_01.jpg
+```
+
 ## 주의사항
 
 - OpenAI API 키가 필요합니다
