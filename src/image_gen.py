@@ -9,7 +9,7 @@ from typing import List
 import openai
 from PIL import Image
 
-from .config import get_config, OUT_1TO1, OUT_3X4
+from .config import get_config, OUT_1TO1, OUT_2X3
 from .io_utils import resize_image, save_image
 from .text_gen import load_prompt
 
@@ -125,7 +125,7 @@ def generate_styled_shot(
     output_dir: Path,
     count: int = 1
 ) -> List[Path]:
-    """제품 연출컷(3:4) 생성"""
+    """제품 연출컷(2:3) 생성"""
     config = get_config()
     client = openai.Client(api_key=config.OPENAI_API_KEY)
     
@@ -146,7 +146,7 @@ def generate_styled_shot(
             import tempfile
             from io import BytesIO
             
-            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품을 사용하여 3:4 비율의 세련된 연출컷을 생성해주세요. (스타일 {i+1})"
+            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품을 사용하여 2:3 비율의 세련된 연출컷을 생성해주세요. (스타일 {i+1})"
             
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
                 img.save(tmp_file.name, format='PNG')
@@ -187,11 +187,11 @@ def generate_styled_shot(
                 image_response = requests.get(image_url)
                 generated_image = PILImage.open(BytesIO(image_response.content))
             
-            generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
+            generated_image = generated_image.resize(OUT_2X3, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 연출컷 {i+1} 생성 성공")
             
-            output_path = output_dir / f"styled_3x4_{i+1:02d}.png"
+            output_path = output_dir / f"styled_2x3_{i+1:02d}.png"
             save_image(generated_image, output_path)
             output_paths.append(output_path)
             
@@ -201,8 +201,8 @@ def generate_styled_shot(
             logger.warning(f"연출컷 {i+1} API 호출 실패: {e}")
             
             # 실패 시 기본 리사이징
-            resized = img.resize(OUT_3X4, Image.Resampling.LANCZOS)
-            output_path = output_dir / f"styled_3x4_{i+1:02d}.png"
+            resized = img.resize(OUT_2X3, Image.Resampling.LANCZOS)
+            output_path = output_dir / f"styled_2x3_{i+1:02d}.png"
             save_image(resized, output_path)
             output_paths.append(output_path)
     
@@ -215,7 +215,7 @@ def generate_wear_shot(
     output_dir: Path,
     count: int = 1
 ) -> List[Path]:
-    """착용컷(3:4) 생성"""
+    """착용컷(2:3) 생성"""
     config = get_config()
     client = openai.Client(api_key=config.OPENAI_API_KEY)
     
@@ -236,7 +236,7 @@ def generate_wear_shot(
             import tempfile
             from io import BytesIO
             
-            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 착용 모습을 3:4 비율로 자연스럽게 생성해주세요. (스타일 {i+1})"
+            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 착용 모습을 2:3 비율로 자연스럽게 생성해주세요. (스타일 {i+1})"
             
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
                 img.save(tmp_file.name, format='PNG')
@@ -277,11 +277,11 @@ def generate_wear_shot(
                 image_response = requests.get(image_url)
                 generated_image = PILImage.open(BytesIO(image_response.content))
             
-            generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
+            generated_image = generated_image.resize(OUT_2X3, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 착용컷 {i+1} 생성 성공")
             
-            output_path = output_dir / f"wear_3x4_{i+1:02d}.png"
+            output_path = output_dir / f"wear_2x3_{i+1:02d}.png"
             save_image(generated_image, output_path)
             output_paths.append(output_path)
             
@@ -291,8 +291,8 @@ def generate_wear_shot(
             logger.warning(f"착용컷 {i+1} API 호출 실패: {e}")
             
             # 실패 시 기본 리사이징
-            resized = img.resize(OUT_3X4, Image.Resampling.LANCZOS)
-            output_path = output_dir / f"wear_3x4_{i+1:02d}.png"
+            resized = img.resize(OUT_2X3, Image.Resampling.LANCZOS)
+            output_path = output_dir / f"wear_2x3_{i+1:02d}.png"
             save_image(resized, output_path)
             output_paths.append(output_path)
     
@@ -305,7 +305,7 @@ def generate_wear_closeup(
     output_dir: Path,
     count: int = 1
 ) -> List[Path]:
-    """클로즈업 착용컷(3:4) 생성"""
+    """클로즈업 착용컷(2:3) 생성"""
     config = get_config()
     client = openai.Client(api_key=config.OPENAI_API_KEY)
     
@@ -326,7 +326,7 @@ def generate_wear_closeup(
             import tempfile
             from io import BytesIO
             
-            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 클로즈업 착용 모습을 3:4 비율로 디테일하게 생성해주세요. (스타일 {i+1})"
+            variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 클로즈업 착용 모습을 2:3 비율로 디테일하게 생성해주세요. (스타일 {i+1})"
             
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
                 img.save(tmp_file.name, format='PNG')
@@ -367,11 +367,11 @@ def generate_wear_closeup(
                 image_response = requests.get(image_url)
                 generated_image = PILImage.open(BytesIO(image_response.content))
             
-            generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
+            generated_image = generated_image.resize(OUT_2X3, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 클로즈업 착용컷 {i+1} 생성 성공")
             
-            output_path = output_dir / f"wear_closeup_3x4_{i+1:02d}.png"
+            output_path = output_dir / f"wear_closeup_2x3_{i+1:02d}.png"
             save_image(generated_image, output_path)
             output_paths.append(output_path)
             
@@ -381,8 +381,8 @@ def generate_wear_closeup(
             logger.warning(f"클로즈업 착용컷 {i+1} API 호출 실패: {e}")
             
             # 실패 시 기본 리사이징
-            resized = img.resize(OUT_3X4, Image.Resampling.LANCZOS)
-            output_path = output_dir / f"wear_closeup_3x4_{i+1:02d}.png"
+            resized = img.resize(OUT_2X3, Image.Resampling.LANCZOS)
+            output_path = output_dir / f"wear_closeup_2x3_{i+1:02d}.png"
             save_image(resized, output_path)
             output_paths.append(output_path)
     
