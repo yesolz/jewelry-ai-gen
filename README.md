@@ -32,19 +32,19 @@ python -m src.cli_desc --image samples/ring01.jpg --type ring --out out/ring01_d
 python -m src.cli_thumb --image samples/ring01.jpg --type ring --out out/ring01_thumb
 ```
 
-### 3. 제품 연출컷 생성 (3:4)
+### 3. 제품 연출컷 생성 (2:3)
 
 ```bash
 python -m src.cli_styled --image samples/ring01.jpg --type ring --out out/ring01_styled
 ```
 
-### 4. 착용컷 생성 (3:4)
+### 4. 착용컷 생성 (2:3)
 
 ```bash
 python -m src.cli_wear --image samples/ring01.jpg --type ring --out out/ring01_wear
 ```
 
-### 5. 클로즈업 착용컷 생성 (3:4)
+### 5. 클로즈업 착용컷 생성 (2:3)
 
 ```bash
 python -m src.cli_wear_closeup --image samples/ring01.jpg --type ring --out out/ring01_close
@@ -68,14 +68,15 @@ out/
     └── [작업별 결과물]
         ├── desc.md                    # 상품 설명
         ├── thumb_1to1.png            # 누끼컷
-        ├── styled_3x4_01.png         # 연출컷
-        ├── wear_3x4_01.png           # 착용컷
-        └── wear_closeup_3x4_01.png   # 클로즈업
+        ├── styled_2x3_01.png         # 연출컷
+        ├── wear_2x3_01.png           # 착용컷
+        └── wear_closeup_2x3_01.png   # 클로즈업
 ```
 
 ### 6. 일괄 생성 (전체 프로세스 한번에 실행)
 
 #### Python 스크립트 사용
+
 ```bash
 # 기본 사용법 (상품 설명, 제품 연출컷, 착용컷, 클로즈업 착용컷 모두 생성)
 python generate_all.py --image samples/necklace.png --type necklace
@@ -88,6 +89,7 @@ python generate_all.py --image samples/bracelet.jpg --type bracelet --skip-desc
 ```
 
 #### Bash 스크립트 사용
+
 ```bash
 # 기본 사용법
 ./generate_all.sh samples/necklace.png necklace
@@ -97,16 +99,17 @@ python generate_all.py --image samples/bracelet.jpg --type bracelet --skip-desc
 ```
 
 생성되는 디렉토리 구조:
+
 ```
 out/necklace_necklace_all/
 ├── desc/           # 상품 설명
 │   └── description.txt
 ├── styled/         # 제품 연출컷
-│   └── styled_3x4_01.jpg
+│   └── styled_2x3_01.jpg
 ├── wear/           # 착용컷
-│   └── wear_3x4_01.jpg
+│   └── wear_2x3_01.jpg
 └── closeup/        # 클로즈업 착용컷
-    └── wear_closeup_3x4_01.jpg
+    └── wear_closeup_2x3_01.jpg
 ```
 
 ## 주의사항
@@ -118,7 +121,4 @@ out/necklace_necklace_all/
 
 ## 확장 예정 기능
 
-- 백그라운드 제거 (rembg)
-- S3 업로드 옵션
 - 웹 API 인터페이스 (FastAPI)
-- 배치 처리 기능
