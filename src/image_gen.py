@@ -35,37 +35,51 @@ def generate_thumbnail(
     logger.info(f"누끼컷 생성 API 호출: {config.MODEL_IMAGE}")
     
     try:
-        # 이미지를 base64로 인코딩
+        # 이미지를 임시 파일로 저장 (images.edit API용)
         import base64
         import tempfile
         from io import BytesIO
         
-        # 이미지를 base64로 변환
-        img_byte_arr = BytesIO()
-        img.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        base64_image = base64.b64encode(img_byte_arr).decode('utf-8')
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            img.save(tmp_file.name, format='PNG')
+            tmp_image_path = tmp_file.name
         
-        # gpt-image-1으로 이미지 생성 요청 (images API 사용)
-        response = client.images.generate(
-            model=config.MODEL_IMAGE,
-            prompt=f"{prompt}\n\n이 이미지를 참고하여 1:1 정사각형 비율의 깨끗한 누끼컷 이미지를 생성해주세요.",
-            n=1,
-            size="1024x1024",
-            quality="high"
-        )
+        try:
+            # gpt-image-1으로 이미지 편집 요청 (images.edit API 사용)
+            with open(tmp_image_path, 'rb') as image_file:
+                response = client.images.edit(
+                    model=config.MODEL_IMAGE,
+                    image=image_file,
+                    prompt=f"{prompt}\n\n이 이미지를 참고하여 1:1 정사각형 비율의 깨끗한 누끼컷 이미지를 생성해주세요.",
+                    n=1,
+                    size="1024x1024",
+                    input_fidelity="high"  # 높은 입력 충실도 사용
+                )
+        finally:
+            # 임시 파일 삭제
+            import os
+            if os.path.exists(tmp_image_path):
+                os.unlink(tmp_image_path)
         
         # gpt-image-1 응답 처리
-        logger.info("gpt-image-1 응답 받음, 이미지 다운로드 시도")
+        logger.info("gpt-image-1 응답 받음, 이미지 처리 시도")
         
-        # 생성된 이미지 다운로드
-        import requests
+        # images.edit API는 base64 형식으로 응답
         from PIL import Image as PILImage
         from io import BytesIO
         
-        image_url = response.data[0].url
-        image_response = requests.get(image_url)
-        generated_img = PILImage.open(BytesIO(image_response.content))
+        if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+            # base64 데이터 처리
+            image_base64 = response.data[0].b64_json
+            image_bytes = base64.b64decode(image_base64)
+            generated_img = PILImage.open(BytesIO(image_bytes))
+        else:
+            # URL에서 이미지 다운로드 (폴백)
+            import requests
+            image_url = response.data[0].url
+            image_response = requests.get(image_url)
+            generated_img = PILImage.open(BytesIO(image_response.content))
+        
         generated_img = generated_img.resize((OUT_1TO1, OUT_1TO1), Image.Resampling.LANCZOS)
         
         output_path = output_dir / "thumb_1to1.png"
@@ -109,7 +123,7 @@ def generate_styled_shot(
     image_path: Path,
     jewelry_type: str,
     output_dir: Path,
-    count: int = 2
+    count: int = 1
 ) -> List[Path]:
     """제품 연출컷(3:4) 생성"""
     config = get_config()
@@ -127,58 +141,52 @@ def generate_styled_shot(
     
     for i in range(count):
         try:
-            # 이미지를 base64로 인코딩
+            # 이미지를 임시 파일로 저장 (images.edit API용)
             import base64
+            import tempfile
             from io import BytesIO
             
-            img_byte_arr = BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            base64_image = base64.b64encode(img_byte_arr).decode('utf-8')
-            
-            # gpt-image-1으로 이미지 생성 요청
             variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품을 사용하여 3:4 비율의 세련된 연출컷을 생성해주세요. (스타일 {i+1})"
             
-            response = client.images.generate(
-                model=config.MODEL_IMAGE,
-                prompt=variation_prompt,
-                n=1,
-                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
-                quality="high"
-            )
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                img.save(tmp_file.name, format='PNG')
+                tmp_image_path = tmp_file.name
             
-            # 생성된 이미지 처리
-            import requests
+            try:
+                # gpt-image-1으로 이미지 편집 요청 (images.edit API 사용)
+                with open(tmp_image_path, 'rb') as image_file:
+                    response = client.images.edit(
+                        model=config.MODEL_IMAGE,
+                        image=image_file,
+                        prompt=variation_prompt,
+                        n=1,
+                        size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                        input_fidelity="high"  # 높은 입력 충실도 사용
+                    )
+            finally:
+                # 임시 파일 삭제
+                import os
+                if os.path.exists(tmp_image_path):
+                    os.unlink(tmp_image_path)
+            
+            # images.edit API 응답 처리
             from PIL import Image as PILImage
             from io import BytesIO
             
-            # 응답 확인
-            if hasattr(response, 'data') and response.data:
-                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
-                    # base64 데이터 처리
-                    logger.info("base64 형식의 이미지 데이터 처리 중")
-                    b64_data = response.data[0].b64_json
-                    
-                    # 'data:image/png;base64,' 프리픽스 제거
-                    if b64_data.startswith('data:image/'):
-                        b64_data = b64_data.split(',')[1]
-                    
-                    # base64 디코딩
-                    image_data = base64.b64decode(b64_data)
-                    generated_image = PILImage.open(BytesIO(image_data))
-                elif hasattr(response.data[0], 'url') and response.data[0].url:
-                    # URL에서 이미지 다운로드
-                    logger.info("URL에서 이미지 다운로드 중")
-                    image_url = response.data[0].url
-                    image_response = requests.get(image_url)
-                    generated_image = PILImage.open(BytesIO(image_response.content))
-                else:
-                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
-                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                # base64 데이터 처리
+                logger.info("base64 형식의 이미지 데이터 처리 중")
+                image_base64 = response.data[0].b64_json
+                image_bytes = base64.b64decode(image_base64)
+                generated_image = PILImage.open(BytesIO(image_bytes))
             else:
-                logger.error(f"응답 형식 오류: {response}")
-                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
-                
+                # URL에서 이미지 다운로드 (폴백)
+                logger.info("URL에서 이미지 다운로드 중")
+                import requests
+                image_url = response.data[0].url
+                image_response = requests.get(image_url)
+                generated_image = PILImage.open(BytesIO(image_response.content))
+            
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 연출컷 {i+1} 생성 성공")
@@ -205,7 +213,7 @@ def generate_wear_shot(
     image_path: Path,
     jewelry_type: str,
     output_dir: Path,
-    count: int = 2
+    count: int = 1
 ) -> List[Path]:
     """착용컷(3:4) 생성"""
     config = get_config()
@@ -223,58 +231,52 @@ def generate_wear_shot(
     
     for i in range(count):
         try:
-            # 이미지를 base64로 인코딩
+            # 이미지를 임시 파일로 저장 (images.edit API용)
             import base64
+            import tempfile
             from io import BytesIO
             
-            img_byte_arr = BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            base64_image = base64.b64encode(img_byte_arr).decode('utf-8')
-            
-            # gpt-image-1으로 이미지 생성 요청
             variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 착용 모습을 3:4 비율로 자연스럽게 생성해주세요. (스타일 {i+1})"
             
-            response = client.images.generate(
-                model=config.MODEL_IMAGE,
-                prompt=variation_prompt,
-                n=1,
-                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
-                quality="high"
-            )
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                img.save(tmp_file.name, format='PNG')
+                tmp_image_path = tmp_file.name
             
-            # 생성된 이미지 처리
-            import requests
+            try:
+                # gpt-image-1으로 이미지 편집 요청 (images.edit API 사용)
+                with open(tmp_image_path, 'rb') as image_file:
+                    response = client.images.edit(
+                        model=config.MODEL_IMAGE,
+                        image=image_file,
+                        prompt=variation_prompt,
+                        n=1,
+                        size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                        input_fidelity="high"  # 높은 입력 충실도 사용
+                    )
+            finally:
+                # 임시 파일 삭제
+                import os
+                if os.path.exists(tmp_image_path):
+                    os.unlink(tmp_image_path)
+            
+            # images.edit API 응답 처리
             from PIL import Image as PILImage
             from io import BytesIO
             
-            # 응답 확인
-            if hasattr(response, 'data') and response.data:
-                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
-                    # base64 데이터 처리
-                    logger.info("base64 형식의 이미지 데이터 처리 중")
-                    b64_data = response.data[0].b64_json
-                    
-                    # 'data:image/png;base64,' 프리픽스 제거
-                    if b64_data.startswith('data:image/'):
-                        b64_data = b64_data.split(',')[1]
-                    
-                    # base64 디코딩
-                    image_data = base64.b64decode(b64_data)
-                    generated_image = PILImage.open(BytesIO(image_data))
-                elif hasattr(response.data[0], 'url') and response.data[0].url:
-                    # URL에서 이미지 다운로드
-                    logger.info("URL에서 이미지 다운로드 중")
-                    image_url = response.data[0].url
-                    image_response = requests.get(image_url)
-                    generated_image = PILImage.open(BytesIO(image_response.content))
-                else:
-                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
-                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                # base64 데이터 처리
+                logger.info("base64 형식의 이미지 데이터 처리 중")
+                image_base64 = response.data[0].b64_json
+                image_bytes = base64.b64decode(image_base64)
+                generated_image = PILImage.open(BytesIO(image_bytes))
             else:
-                logger.error(f"응답 형식 오류: {response}")
-                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
-                
+                # URL에서 이미지 다운로드 (폴백)
+                logger.info("URL에서 이미지 다운로드 중")
+                import requests
+                image_url = response.data[0].url
+                image_response = requests.get(image_url)
+                generated_image = PILImage.open(BytesIO(image_response.content))
+            
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 착용컷 {i+1} 생성 성공")
@@ -301,7 +303,7 @@ def generate_wear_closeup(
     image_path: Path,
     jewelry_type: str,
     output_dir: Path,
-    count: int = 2
+    count: int = 1
 ) -> List[Path]:
     """클로즈업 착용컷(3:4) 생성"""
     config = get_config()
@@ -319,58 +321,52 @@ def generate_wear_closeup(
     
     for i in range(count):
         try:
-            # 이미지를 base64로 인코딩
+            # 이미지를 임시 파일로 저장 (images.edit API용)
             import base64
+            import tempfile
             from io import BytesIO
             
-            img_byte_arr = BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            base64_image = base64.b64encode(img_byte_arr).decode('utf-8')
-            
-            # gpt-image-1으로 이미지 생성 요청
             variation_prompt = f"{prompt}\n\n이 {jewelry_type} 제품의 클로즈업 착용 모습을 3:4 비율로 디테일하게 생성해주세요. (스타일 {i+1})"
             
-            response = client.images.generate(
-                model=config.MODEL_IMAGE,
-                prompt=variation_prompt,
-                n=1,
-                size="1024x1536",  # 2:3 비율 (GPT-4 지원)
-                quality="high"
-            )
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                img.save(tmp_file.name, format='PNG')
+                tmp_image_path = tmp_file.name
             
-            # 생성된 이미지 처리
-            import requests
+            try:
+                # gpt-image-1으로 이미지 편집 요청 (images.edit API 사용)
+                with open(tmp_image_path, 'rb') as image_file:
+                    response = client.images.edit(
+                        model=config.MODEL_IMAGE,
+                        image=image_file,
+                        prompt=variation_prompt,
+                        n=1,
+                        size="1024x1536",  # 2:3 비율 (GPT-4 지원)
+                        input_fidelity="high"  # 높은 입력 충실도 사용
+                    )
+            finally:
+                # 임시 파일 삭제
+                import os
+                if os.path.exists(tmp_image_path):
+                    os.unlink(tmp_image_path)
+            
+            # images.edit API 응답 처리
             from PIL import Image as PILImage
             from io import BytesIO
             
-            # 응답 확인
-            if hasattr(response, 'data') and response.data:
-                if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
-                    # base64 데이터 처리
-                    logger.info("base64 형식의 이미지 데이터 처리 중")
-                    b64_data = response.data[0].b64_json
-                    
-                    # 'data:image/png;base64,' 프리픽스 제거
-                    if b64_data.startswith('data:image/'):
-                        b64_data = b64_data.split(',')[1]
-                    
-                    # base64 디코딩
-                    image_data = base64.b64decode(b64_data)
-                    generated_image = PILImage.open(BytesIO(image_data))
-                elif hasattr(response.data[0], 'url') and response.data[0].url:
-                    # URL에서 이미지 다운로드
-                    logger.info("URL에서 이미지 다운로드 중")
-                    image_url = response.data[0].url
-                    image_response = requests.get(image_url)
-                    generated_image = PILImage.open(BytesIO(image_response.content))
-                else:
-                    logger.error(f"response.data[0] 속성: {vars(response.data[0]) if hasattr(response.data[0], '__dict__') else response.data[0]}")
-                    raise ValueError("API 응답에서 이미지 데이터를 찾을 수 없습니다")
+            if hasattr(response.data[0], 'b64_json') and response.data[0].b64_json:
+                # base64 데이터 처리
+                logger.info("base64 형식의 이미지 데이터 처리 중")
+                image_base64 = response.data[0].b64_json
+                image_bytes = base64.b64decode(image_base64)
+                generated_image = PILImage.open(BytesIO(image_bytes))
             else:
-                logger.error(f"응답 형식 오류: {response}")
-                raise ValueError("API 응답에서 data 속성을 찾을 수 없습니다")
-                
+                # URL에서 이미지 다운로드 (폴백)
+                logger.info("URL에서 이미지 다운로드 중")
+                import requests
+                image_url = response.data[0].url
+                image_response = requests.get(image_url)
+                generated_image = PILImage.open(BytesIO(image_response.content))
+            
             generated_image = generated_image.resize(OUT_3X4, Image.Resampling.LANCZOS)
             
             logger.info(f"gpt-image-1로 클로즈업 착용컷 {i+1} 생성 성공")
