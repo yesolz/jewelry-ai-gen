@@ -54,7 +54,7 @@ python -m src.cli_wear_closeup --image samples/ring01.jpg --type ring --out out/
 
 - `--image <경로>`: 기준 이미지 파일 경로 (필수)
 - `--type <종류>`: 주얼리 종류 (필수)
-  - 지원: ring, necklace, earring, bracelet, pendant, 기타 텍스트
+  - 지원: ring, necklace, earring, bracelet, anklet, etc (기타)
 - `--out <경로>`: 출력 디렉토리 (선택)
   - 미지정 시: `out/작업종류_YYYYmmdd_HHMMSS`
 
