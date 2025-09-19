@@ -63,8 +63,7 @@ def main():
     parser.add_argument(
         "--type",
         required=True,
-        choices=["necklace", "bracelet", "ring", "earring"],
-        help="주얼리 타입"
+        help="주얼리 타입 (ring, necklace, earring, bracelet, anklet, etc)"
     )
     
     parser.add_argument(
@@ -125,27 +124,43 @@ def main():
         ]
     })
     
-    # 3. 착용컷 생성 (3:4)
-    tasks.append({
-        "name": "착용컷 생성",
-        "cmd": [
-            sys.executable, "-m", "src.cli_wear",
-            "--image", args.image,
-            "--type", args.type,
-            "--out", f"{base_out_dir}/wear"
-        ]
-    })
+    # 주얼리 타입에 따라 작업 분기
+    standard_types = ["ring", "necklace", "earring", "bracelet", "anklet"]
     
-    # 4. 클로즈업 착용컷 생성 (3:4)
-    tasks.append({
-        "name": "클로즈업 착용컷 생성",
-        "cmd": [
-            sys.executable, "-m", "src.cli_wear_closeup",
-            "--image", args.image,
-            "--type", args.type,
-            "--out", f"{base_out_dir}/closeup"
-        ]
-    })
+    if args.type.lower() in standard_types:
+        # 3. 착용컷 생성 (3:4)
+        tasks.append({
+            "name": "착용컷 생성",
+            "cmd": [
+                sys.executable, "-m", "src.cli_wear",
+                "--image", args.image,
+                "--type", args.type,
+                "--out", f"{base_out_dir}/wear"
+            ]
+        })
+        
+        # 4. 클로즈업 착용컷 생성 (3:4)
+        tasks.append({
+            "name": "클로즈업 착용컷 생성",
+            "cmd": [
+                sys.executable, "-m", "src.cli_wear_closeup",
+                "--image", args.image,
+                "--type", args.type,
+                "--out", f"{base_out_dir}/closeup"
+            ]
+        })
+    else:
+        # 기타 주얼리의 경우 연출컷 3개 생성
+        for i in range(1, 4):
+            tasks.append({
+                "name": f"제품 연출컷 {i} 생성",
+                "cmd": [
+                    sys.executable, "-m", "src.cli_styled",
+                    "--image", args.image,
+                    "--type", args.type,
+                    "--out", f"{base_out_dir}/styled{i}"
+                ]
+            })
     
     # 작업 실행
     total_tasks = len(tasks)
