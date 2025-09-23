@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QGridLayout, QTextEdit, QFileDialog, QMessageBox,
     QHeaderView, QProgressBar, QToolBar, QComboBox, QSpinBox,
     QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QScrollArea,
-    QCheckBox, QTabWidget
+    QCheckBox, QTabWidget, QSizePolicy
 )
 
 # 프로젝트 루트 경로 설정
@@ -607,6 +607,25 @@ class MainWindow(QMainWindow):
                 border: 1px solid #2d679f;
                 color: #1a4d73;
             }
+            /* 종료 버튼 특별 스타일 */
+            QToolBar QToolButton[text="프로그램 종료"] {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ffebee, stop:1 #ffcdd2);
+                border: 1px solid #e57373;
+                color: #d32f2f;
+            }
+            QToolBar QToolButton[text="프로그램 종료"]:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ffcdd2, stop:1 #ef9a9a);
+                border: 1px solid #f44336;
+                color: #b71c1c;
+            }
+            QToolBar QToolButton[text="프로그램 종료"]:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ef9a9a, stop:1 #e57373);
+                border: 1px solid #d32f2f;
+                color: #b71c1c;
+            }
         """)
         
         # 폴더 열기
@@ -616,6 +635,16 @@ class MainWindow(QMainWindow):
         
         toolbar.addSeparator()
         
+        # 우측 공간 확보
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        toolbar.addWidget(spacer)
+        
+        # 종료 버튼 (우측 상단)
+        exit_action = QAction("프로그램 종료", self)
+        exit_action.triggered.connect(self.close)
+        exit_action.setToolTip("프로그램을 안전하게 종료합니다")
+        toolbar.addAction(exit_action)
         
         # 메인 위젯
         main_widget = QWidget()
