@@ -13,7 +13,7 @@ from .logging_conf import setup_logging
 def main():
     parser = argparse.ArgumentParser(description="주얼리 클로즈업 착용컷 생성")
     parser.add_argument("--image", required=True, help="기준 이미지 경로")
-    parser.add_argument("--type", required=True, help="주얼리 종류 (ring|necklace|earring|bracelet|pendant|기타)")
+    parser.add_argument("--type", required=True, help="주얼리 종류 (ring|necklace|earring|bracelet|anklet|etc)")
     parser.add_argument("--out", help="출력 디렉토리")
     
     args = parser.parse_args()
