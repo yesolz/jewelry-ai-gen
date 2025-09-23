@@ -25,6 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from src.pipeline import generate_all
 from src.batch_processor import BatchProcessor, process_inbox_folders
+from src.config_manager import config_manager
+from src.ui.settings_dialog import SettingsDialog, FirstRunDialog
 
 
 class ClickableImageLabel(QLabel):
@@ -557,6 +559,10 @@ class MainWindow(QMainWindow):
         self.current_thread = None
         self.batch_thread = None
         self.refresh_timer = None
+        
+        # 첫 실행 확인 및 설정
+        self.check_first_run()
+        
         self.setup_ui()
         self.refresh_dashboard_data()
         
@@ -577,6 +583,11 @@ class MainWindow(QMainWindow):
         refresh_action = QAction("새로고침", self)
         refresh_action.triggered.connect(self.load_jobs)
         toolbar.addAction(refresh_action)
+        
+        # 설정
+        settings_action = QAction("⚙️ 설정", self)
+        settings_action.triggered.connect(self.open_settings)
+        toolbar.addAction(settings_action)
         
         toolbar.addSeparator()
         
@@ -690,6 +701,53 @@ class MainWindow(QMainWindow):
         
         self.statusBar().addPermanentWidget(self.progress_bar)
         self.statusBar().showMessage("준비됨")
+    
+    def check_first_run(self):
+        """첫 실행 확인 및 설정 가이드"""
+        if config_manager.is_first_run():
+            dialog = FirstRunDialog(self)
+            if dialog.exec() == QDialog.Accepted:
+                # 설정이 완료되면 작업 폴더를 업데이트
+                self.update_work_directory()
+            else:
+                # 나중에 설정하기를 선택한 경우
+                config = config_manager.load_config()
+                config["first_run"] = False
+                config_manager.save_config(config)
+        else:
+            self.update_work_directory()
+    
+    def update_work_directory(self):
+        """작업 디렉토리 업데이트"""
+        work_folder = config_manager.get_work_folder()
+        if work_folder:
+            # 현재 작업 디렉토리를 설정된 폴더로 변경
+            os.chdir(work_folder)
+            print(f"✅ 작업 디렉토리: {work_folder}")
+        else:
+            print("⚠️  작업 폴더가 설정되지 않았습니다. 설정에서 작업 폴더를 선택해주세요.")
+        
+        # 모든 환경변수 적용
+        config_manager.apply_environment_variables()
+        
+        # 설정 상태 확인
+        if config_manager.has_valid_api_key():
+            print("✅ API 키가 설정되었습니다.")
+        else:
+            print("⚠️  API 키가 설정되지 않았습니다. 설정에서 API 키를 입력해주세요.")
+        
+        model_settings = config_manager.get_model_settings()
+        print(f"✅ 모델 설정: 텍스트={model_settings['model_text']}, 이미지={model_settings['model_image']}")
+    
+    def open_settings(self):
+        """설정 다이얼로그 열기"""
+        dialog = SettingsDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            # 설정 변경 시 작업 디렉토리 업데이트
+            self.update_work_directory()
+            # 대시보드 새로고침
+            self.refresh_dashboard_data()
+            QMessageBox.information(self, "설정 완료", "설정이 저장되었습니다.")
     
     def setup_normal_mode(self):
         """일반 모드 UI 설정 (기존 Job 테이블)"""
@@ -876,7 +934,11 @@ class MainWindow(QMainWindow):
     
     def scan_inbox_files(self):
         """inbox 폴더에서 대기 중인 파일들 스캔"""
-        inbox_dir = Path("inbox")
+        work_folder = config_manager.get_work_folder()
+        if not work_folder:
+            return {}
+        
+        inbox_dir = work_folder / "inbox"
         if not inbox_dir.exists():
             return {}
         
@@ -904,7 +966,11 @@ class MainWindow(QMainWindow):
     
     def scan_completed_jobs(self):
         """완료된 작업들 스캔 (out/ 폴더의 모든 처리된 작업)"""
-        out_dir = Path("out")
+        work_folder = config_manager.get_work_folder()
+        if not work_folder:
+            return []
+        
+        out_dir = work_folder / "out"
         if not out_dir.exists():
             return []
         
@@ -1148,8 +1214,26 @@ class MainWindow(QMainWindow):
     
     def batch_generate(self):
         """일괄 생성 (폴더 구조 지원)"""
+        # 작업 폴더 확인
+        work_folder = config_manager.get_work_folder()
+        if not work_folder:
+            QMessageBox.warning(
+                self, 
+                "작업 폴더 미설정", 
+                "먼저 설정에서 작업 폴더를 선택해주세요."
+            )
+            self.open_settings()
+            return
+        
+        # inbox 폴더 기본 경로
+        default_inbox = work_folder / "inbox"
+        
         # inbox 폴더 선택
-        inbox_dir = QFileDialog.getExistingDirectory(self, "입력 폴더 선택", "inbox")
+        inbox_dir = QFileDialog.getExistingDirectory(
+            self, 
+            "입력 폴더 선택", 
+            str(default_inbox)
+        )
         if not inbox_dir:
             return
         

@@ -279,7 +279,7 @@ python -m src.cli_wear_closeup --image samples/ring01.jpg --type ring --out out/
 ## 시스템 요구사항
 
 - Python 3.8 이상
-- OpenAI API 키 (GPT-4V, DALL-E 3)
+- OpenAI API 키
 - 4GB 이상 RAM 권장
 - 안정적인 인터넷 연결
 
