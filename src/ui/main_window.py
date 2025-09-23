@@ -447,8 +447,19 @@ class JobDetailPanel(QWidget):
         if not meta_path.exists():
             return
         
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            meta = json.load(f)
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    print(f"Empty meta.json file: {meta_path}")
+                    return
+                meta = json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON in meta.json: {meta_path}, error: {e}")
+            return
+        except Exception as e:
+            print(f"Error reading meta.json: {meta_path}, error: {e}")
+            return
         
         # 기본 정보 표시
         self.job_id_label.setText(job_id)
@@ -908,7 +919,18 @@ class MainWindow(QMainWindow):
             
             try:
                 with open(meta_path, 'r', encoding='utf-8') as f:
-                    meta = json.load(f)
+                    content = f.read().strip()
+                    if not content:
+                        # 빈 파일인 경우
+                        jobs.append({
+                            "job_id": job_dir.name,
+                            "type": "알 수 없음",
+                            "status": "오류",
+                            "created_at": "-",
+                            "src_name": "빈 meta.json"
+                        })
+                        continue
+                    meta = json.loads(content)
                 
                 # 모든 상태의 작업 포함 (done, partial, failed, processing)
                 jobs.append({
@@ -918,14 +940,23 @@ class MainWindow(QMainWindow):
                     "created_at": meta.get("created_at", "-"),
                     "src_name": meta.get("src_name", "-")
                 })
-            except Exception as e:
-                # 파싱 실패한 경우도 표시
+            except json.JSONDecodeError as e:
+                # JSON 파싱 실패한 경우
                 jobs.append({
                     "job_id": job_dir.name,
                     "type": "알 수 없음",
                     "status": "오류",
                     "created_at": "-",
-                    "src_name": "-"
+                    "src_name": f"JSON 오류: {str(e)[:20]}..."
+                })
+            except Exception as e:
+                # 기타 파싱 실패한 경우
+                jobs.append({
+                    "job_id": job_dir.name,
+                    "type": "알 수 없음",
+                    "status": "오류",
+                    "created_at": "-",
+                    "src_name": f"파일 오류: {str(e)[:20]}..."
                 })
         
         # 생성일 기준 정렬 (최신순)
@@ -1033,7 +1064,10 @@ class MainWindow(QMainWindow):
             
             try:
                 with open(meta_path, 'r', encoding='utf-8') as f:
-                    meta = json.load(f)
+                    content = f.read().strip()
+                    if not content:
+                        continue  # 빈 파일은 건너뛰기
+                    meta = json.loads(content)
                 
                 jobs.append({
                     "job_id": job_dir.name,
@@ -1042,8 +1076,8 @@ class MainWindow(QMainWindow):
                     "created_at": meta.get("created_at", "-"),
                     "src_name": meta.get("src_name", "-")
                 })
-            except:
-                continue
+            except (json.JSONDecodeError, Exception):
+                continue  # 파싱 실패한 파일은 건너뛰기
         
         # 생성일 기준 정렬 (최신순)
         jobs.sort(key=lambda x: x["created_at"], reverse=True)
@@ -1331,14 +1365,22 @@ class MainWindow(QMainWindow):
             meta_path = job_dir / "meta.json"
             
             if meta_path.exists():
-                with open(meta_path, 'r', encoding='utf-8') as f:
-                    meta = json.load(f)
-                
-                meta["status"] = status
-                meta["updated_at"] = datetime.now().isoformat()
-                
-                with open(meta_path, 'w', encoding='utf-8') as f:
-                    json.dump(meta, f, indent=2, ensure_ascii=False)
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if not content:
+                            print(f"Empty meta.json file for status update: {meta_path}")
+                            return
+                        meta = json.loads(content)
+                    
+                    meta["status"] = status
+                    meta["updated_at"] = datetime.now().isoformat()
+                    
+                    with open(meta_path, 'w', encoding='utf-8') as f:
+                        json.dump(meta, f, indent=2, ensure_ascii=False)
+                except (json.JSONDecodeError, Exception) as e:
+                    print(f"Failed to update job status for {job_id}: {e}")
+                    return
                 
                 # 대시보드 새로고침
                 self.refresh_dashboard_data()
