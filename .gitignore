@@ -10,6 +10,11 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.pyc
+*.pyo
+*.pyd
+.tox/
+.pytest_cache/
 
 # Environment variables
 .env
@@ -31,7 +36,16 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
+# PyInstaller & py2app build files
+build/
+dist/
+*.spec
+*.app/
+*.exe
+*.dmg
+*.zip
+
+# Project specific - working directories
 out/
 inbox/
 archive/
@@ -41,12 +55,35 @@ logs/
 runs/
 samples/
 
+# Configuration files (user-specific)
+config.json
+.jewelryai/
+
+
 # Temporary files
 *.tmp
 *.temp
 *.log
+*.bak
 
 # PySide6/Qt
 *.pro.user
 *.pro.user.*
 .qmake.stash
+
+# macOS app bundle contents
+*.app/Contents/
+
+# Icon files (optional - uncomment if you don't want to track icons)
+# *.icns
+# *.ico
+
+# Large model files or downloads
+*.model
+*.weights
+downloads/
+
+# Test outputs
+test_*.png
+test_*.jpg
+debug_*
