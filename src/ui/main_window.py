@@ -1502,7 +1502,6 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             # 재생성 시작 전 상태를 reprocessing으로 변경
             self._update_job_status(job_id, "reprocessing")
-            self.statusBar().showMessage(f"{artifact_type} 재생성 중...")
             
             # 병렬 재생성 스레드 시작
             self.start_regeneration_thread(job_id, artifact_type)
@@ -1528,11 +1527,12 @@ class MainWindow(QMainWindow):
         if running_count < max_regeneration_workers:
             # 즉시 실행
             self._start_regeneration_now(job_id, artifact_type)
+            self._update_regeneration_status()
             print(f"🔄 재생성 시작: {job_id}/{artifact_type} (실행중: {running_count + 1}/{max_regeneration_workers})")
         else:
             # 대기열에 추가
             self.regeneration_queue.append((job_id, artifact_type))
-            self.statusBar().showMessage(f"재생성 대기 중... (대기열: {len(self.regeneration_queue)}개)")
+            self._update_regeneration_status()
             print(f"⏳ 재생성 대기열 추가: {job_id}/{artifact_type} (대기: {len(self.regeneration_queue)}개)")
     
     def _start_regeneration_now(self, job_id: str, artifact_type: str):
@@ -1561,6 +1561,9 @@ class MainWindow(QMainWindow):
         
         # 대기열에서 다음 작업 실행
         self._process_regeneration_queue()
+        
+        # 상태 업데이트
+        self._update_regeneration_status()
     
     def _on_regeneration_error(self, error: str, job_id: str, thread):
         """재생성 오류 처리 + 대기열 실행"""
@@ -1573,6 +1576,9 @@ class MainWindow(QMainWindow):
         
         # 대기열에서 다음 작업 실행
         self._process_regeneration_queue()
+        
+        # 상태 업데이트
+        self._update_regeneration_status()
     
     def _process_regeneration_queue(self):
         """대기열에서 다음 재생성 작업 실행"""
@@ -1581,12 +1587,30 @@ class MainWindow(QMainWindow):
             self._start_regeneration_now(job_id, artifact_type)
             
             remaining = len(self.regeneration_queue)
-            if remaining > 0:
-                self.statusBar().showMessage(f"대기열에서 재생성 시작... (남은 대기: {remaining}개)")
-            else:
-                self.statusBar().showMessage("재생성 진행 중...")
-            
             print(f"📤 대기열에서 실행: {job_id}/{artifact_type} (남은 대기: {remaining}개)")
+    
+    def _update_regeneration_status(self):
+        """재생성 상태바 업데이트"""
+        if not hasattr(self, 'regeneration_threads'):
+            self.regeneration_threads = []
+        if not hasattr(self, 'regeneration_queue'):
+            self.regeneration_queue = []
+        
+        # 완료된 스레드 정리
+        self.regeneration_threads = [t for t in self.regeneration_threads if t.isRunning()]
+        
+        running_count = len(self.regeneration_threads)
+        queue_count = len(self.regeneration_queue)
+        
+        if running_count == 0 and queue_count == 0:
+            # 재생성 작업이 없으면 기본 상태로
+            self.statusBar().showMessage("준비됨")
+        elif queue_count == 0:
+            # 대기열 없음, 실행 중만 있음
+            self.statusBar().showMessage(f"재생성 중... ({running_count}개 실행중)")
+        else:
+            # 대기열 있음
+            self.statusBar().showMessage(f"재생성 중... ({running_count}개 실행중, {queue_count}개 대기중)")
     
     def _update_job_status(self, job_id: str, status: str):
         """Job 상태 업데이트"""
