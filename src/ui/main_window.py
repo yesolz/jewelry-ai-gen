@@ -84,8 +84,12 @@ class GenerationThread(QThread):
                 result = generate_all(**self.kwargs)
                 self.finished.emit(result)
             elif self.task_type == "regenerate_cli":
-                # CLI 모듈 직접 호출
+                # CLI 모듈 직접 호출 (기존 방식)
                 result = self._run_cli_regenerate()
+                self.finished.emit(result)
+            elif self.task_type == "regenerate_direct":
+                # 직접 재생성 (병렬처리 최적화)
+                result = self._run_direct_regenerate()
                 self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
@@ -219,6 +223,74 @@ class GenerationThread(QThread):
         # meta.json 저장
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
+    
+    def _run_direct_regenerate(self):
+        """직접 재생성 (병렬처리 최적화) - 내부 모듈 직접 호출"""
+        job_id = self.kwargs["job_id"]
+        artifact = self.kwargs["artifact"]
+        
+        try:
+            # job 정보 읽기
+            job_dir = Path("out") / job_id
+            meta_path = job_dir / "meta.json"
+            
+            if not meta_path.exists():
+                return {"success": False, "error": "Job meta.json not found"}
+            
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            
+            # work 이미지 경로
+            work_dir = Path("work") / job_id
+            work_image = work_dir / "input.png"
+            
+            if not work_image.exists():
+                # 원본에서 다시 생성
+                from src.pipeline import resize_image
+                import shutil
+                
+                original_path = Path(meta.get("input_path", ""))
+                if original_path.exists():
+                    work_dir.mkdir(parents=True, exist_ok=True)
+                    resized_path = resize_image(original_path)
+                    shutil.copy2(resized_path, work_image)
+                else:
+                    return {"success": False, "error": "Original input image not found"}
+            
+            # 직접 내부 모듈 호출 (subprocess 없이)
+            jewelry_type = meta["type"]
+            output_dir = job_dir / artifact
+            
+            if artifact == "desc":
+                from src.processor import process_description
+                result_dir = process_description(str(work_image), jewelry_type, str(output_dir))
+                result = {"success": True, "output_dir": result_dir}
+            elif artifact == "styled" or artifact.startswith("styled"):
+                from src.processor import process_styled
+                result_dir = process_styled(str(work_image), jewelry_type, str(output_dir))
+                result = {"success": True, "output_dir": result_dir}
+            elif artifact == "wear":
+                from src.processor import process_wear
+                result_dir = process_wear(str(work_image), jewelry_type, str(output_dir))
+                result = {"success": True, "output_dir": result_dir}
+            elif artifact == "closeup":
+                from src.processor import process_wear_closeup
+                result_dir = process_wear_closeup(str(work_image), jewelry_type, str(output_dir))
+                result = {"success": True, "output_dir": result_dir}
+            else:
+                return {"success": False, "error": f"Unknown artifact type: {artifact}"}
+            
+            # 성공 시 버전 정보 업데이트
+            if result.get("success", True) and result.get("output_dir"):
+                self._update_version_info(job_id, artifact)
+                return {"success": True, "job_id": job_id, "artifact": artifact}
+            else:
+                return {"success": False, "error": result.get("error", "Generation failed")}
+                
+        except ImportError as e:
+            return {"success": False, "error": f"모듈 import 실패: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"재생성 실패: {str(e)}"}
 
 
 class BatchGenerationThread(QThread):
@@ -1422,7 +1494,7 @@ class MainWindow(QMainWindow):
         self.batch_thread.start()
     
     def regenerate_artifact(self, job_id: str, artifact_type: str):
-        """산출물 재생성"""
+        """산출물 재생성 - 병렬처리 지원"""
         reply = QMessageBox.question(self, "재생성 확인", 
                                    f"{artifact_type} 산출물을 재생성하시겠습니까?",
                                    QMessageBox.Yes | QMessageBox.No)
@@ -1432,19 +1504,89 @@ class MainWindow(QMainWindow):
             self._update_job_status(job_id, "reprocessing")
             self.statusBar().showMessage(f"{artifact_type} 재생성 중...")
             
-            # 이전 스레드 정리
-            if self.current_thread and self.current_thread.isRunning():
-                self.current_thread.terminate()
-                self.current_thread.wait()
+            # 병렬 재생성 스레드 시작
+            self.start_regeneration_thread(job_id, artifact_type)
+    
+    def start_regeneration_thread(self, job_id: str, artifact_type: str):
+        """재생성 스레드 시작 (제한된 병렬처리 + 대기열)"""
+        # 재생성 관리 초기화
+        if not hasattr(self, 'regeneration_threads'):
+            self.regeneration_threads = []
+        if not hasattr(self, 'regeneration_queue'):
+            self.regeneration_queue = []
+        
+        # 완료된 스레드 정리
+        self.regeneration_threads = [t for t in self.regeneration_threads if t.isRunning()]
+        
+        # 설정에서 최대 동시 실행 개수 가져오기
+        config = config_manager.load_config()
+        max_regeneration_workers = min(config.get("max_workers", 2), 4)  # 최대 4개로 제한
+        
+        # 현재 실행 중인 재생성 개수 확인
+        running_count = len(self.regeneration_threads)
+        
+        if running_count < max_regeneration_workers:
+            # 즉시 실행
+            self._start_regeneration_now(job_id, artifact_type)
+            print(f"🔄 재생성 시작: {job_id}/{artifact_type} (실행중: {running_count + 1}/{max_regeneration_workers})")
+        else:
+            # 대기열에 추가
+            self.regeneration_queue.append((job_id, artifact_type))
+            self.statusBar().showMessage(f"재생성 대기 중... (대기열: {len(self.regeneration_queue)}개)")
+            print(f"⏳ 재생성 대기열 추가: {job_id}/{artifact_type} (대기: {len(self.regeneration_queue)}개)")
+    
+    def _start_regeneration_now(self, job_id: str, artifact_type: str):
+        """재생성 즉시 시작"""
+        regen_thread = GenerationThread(
+            "regenerate_direct",
+            job_id=job_id,
+            artifact=artifact_type
+        )
+        
+        # 재생성 완료 시 콜백 (대기열 처리 포함)
+        regen_thread.finished.connect(lambda result: self._on_regeneration_completed(result, job_id, regen_thread))
+        regen_thread.error.connect(lambda error: self._on_regeneration_error(error, job_id, regen_thread))
+        
+        self.regeneration_threads.append(regen_thread)
+        regen_thread.start()
+    
+    def _on_regeneration_completed(self, result, job_id: str, thread):
+        """재생성 완료 처리 + 대기열 실행"""
+        # 기존 완료 처리
+        self.on_regeneration_finished(result, job_id)
+        
+        # 스레드 제거
+        if thread in self.regeneration_threads:
+            self.regeneration_threads.remove(thread)
+        
+        # 대기열에서 다음 작업 실행
+        self._process_regeneration_queue()
+    
+    def _on_regeneration_error(self, error: str, job_id: str, thread):
+        """재생성 오류 처리 + 대기열 실행"""
+        # 기존 오류 처리
+        self.on_regeneration_error(error, job_id)
+        
+        # 스레드 제거
+        if thread in self.regeneration_threads:
+            self.regeneration_threads.remove(thread)
+        
+        # 대기열에서 다음 작업 실행
+        self._process_regeneration_queue()
+    
+    def _process_regeneration_queue(self):
+        """대기열에서 다음 재생성 작업 실행"""
+        if hasattr(self, 'regeneration_queue') and self.regeneration_queue:
+            job_id, artifact_type = self.regeneration_queue.pop(0)
+            self._start_regeneration_now(job_id, artifact_type)
             
-            self.current_thread = GenerationThread(
-                "regenerate_cli",
-                job_id=job_id,
-                artifact=artifact_type
-            )
-            self.current_thread.finished.connect(lambda result: self.on_regeneration_finished(result, job_id))
-            self.current_thread.error.connect(lambda error: self.on_regeneration_error(error, job_id))
-            self.current_thread.start()
+            remaining = len(self.regeneration_queue)
+            if remaining > 0:
+                self.statusBar().showMessage(f"대기열에서 재생성 시작... (남은 대기: {remaining}개)")
+            else:
+                self.statusBar().showMessage("재생성 진행 중...")
+            
+            print(f"📤 대기열에서 실행: {job_id}/{artifact_type} (남은 대기: {remaining}개)")
     
     def _update_job_status(self, job_id: str, status: str):
         """Job 상태 업데이트"""
@@ -1646,6 +1788,17 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'batch_thread') and self.batch_thread and self.batch_thread.isRunning():
             self.batch_thread.terminate()
             self.batch_thread.wait(3000)  # 3초 대기
+        
+        # 재생성 스레드들 정리
+        if hasattr(self, 'regeneration_threads'):
+            for thread in self.regeneration_threads:
+                if thread.isRunning():
+                    thread.terminate()
+                    thread.wait(1000)  # 1초 대기
+        
+        # 재생성 대기열 정리
+        if hasattr(self, 'regeneration_queue'):
+            self.regeneration_queue.clear()
         
         # 타이머 정리
         if hasattr(self, 'refresh_timer') and self.refresh_timer:
