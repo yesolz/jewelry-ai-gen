@@ -651,6 +651,10 @@ class MainWindow(QMainWindow):
         """)
         
         # 폴더 열기
+        open_inbox_action = QAction("inbox 폴더 열기", self)
+        open_inbox_action.triggered.connect(self.open_inbox_folder)
+        toolbar.addAction(open_inbox_action)
+        
         open_folder_action = QAction("출력 폴더 열기", self)
         open_folder_action.triggered.connect(self.open_output_folder)
         toolbar.addAction(open_folder_action)
@@ -1493,6 +1497,40 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "실패", f"Export 실패: {result.stderr}")
         except Exception as e:
             QMessageBox.critical(self, "오류", str(e))
+    
+    def open_inbox_folder(self):
+        """inbox 폴더 열기"""
+        import subprocess
+        import platform
+        
+        work_folder = config_manager.get_work_folder()
+        if not work_folder:
+            QMessageBox.warning(
+                self, 
+                "작업 폴더 미설정", 
+                "먼저 설정에서 작업 폴더를 선택해주세요."
+            )
+            self.open_settings()
+            return
+        
+        inbox_dir = work_folder / "inbox"
+        if not inbox_dir.exists():
+            QMessageBox.warning(
+                self, 
+                "폴더 없음", 
+                "inbox 폴더가 존재하지 않습니다."
+            )
+            return
+        
+        try:
+            if platform.system() == "Windows":
+                subprocess.Popen(["explorer", str(inbox_dir)])
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.Popen(["open", str(inbox_dir)])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", str(inbox_dir)])
+        except Exception as e:
+            QMessageBox.warning(self, "오류", f"폴더 열기 실패: {str(e)}")
     
     def open_output_folder(self):
         """출력 폴더 열기"""
