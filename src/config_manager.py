@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Optional
+import shutil
 
 
 class ConfigManager:
@@ -15,6 +16,8 @@ class ConfigManager:
         # 설정 파일 경로 (사용자 홈 디렉토리의 .jewelryai 폴더)
         self.config_dir = Path.home() / ".jewelryai"
         self.config_file = self.config_dir / "config.json"
+        self.prompts_file = self.config_dir / "prompts.json"
+        self.default_prompts_file = Path(__file__).parent.parent / "default_prompts.json"
         self.default_config = {
             "work_folder": "",
             "last_opened": "",
@@ -28,6 +31,7 @@ class ConfigManager:
             "default_out_root": "out"
         }
         self._ensure_config_dir()
+        self._ensure_prompts_config()
     
     def _ensure_config_dir(self):
         """설정 디렉토리 생성"""
@@ -238,6 +242,90 @@ class ConfigManager:
         """유효한 API 키가 있는지 확인"""
         api_key = self.get_openai_api_key()
         return bool(api_key and api_key.startswith("sk-"))
+    
+    def _ensure_prompts_config(self):
+        """프롬프트 설정 파일 초기화"""
+        if not self.prompts_file.exists() and self.default_prompts_file.exists():
+            # 기본 프롬프트 파일을 사용자 설정으로 복사
+            shutil.copy2(self.default_prompts_file, self.prompts_file)
+    
+    def load_prompts_config(self) -> Dict:
+        """프롬프트 설정 로드"""
+        if not self.prompts_file.exists():
+            # 기본 프롬프트 파일이 있으면 로드
+            if self.default_prompts_file.exists():
+                with open(self.default_prompts_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                # 없으면 빈 설정 반환
+                return {
+                    "base_prompts": {},
+                    "jewelry_specific": {}
+                }
+        
+        try:
+            with open(self.prompts_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"프롬프트 설정 파일 로드 실패: {e}")
+            # 기본 프롬프트로 폴백
+            if self.default_prompts_file.exists():
+                with open(self.default_prompts_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {
+                "base_prompts": {},
+                "jewelry_specific": {}
+            }
+    
+    def save_prompts_config(self, prompts: Dict):
+        """프롬프트 설정 저장"""
+        try:
+            with open(self.prompts_file, 'w', encoding='utf-8') as f:
+                json.dump(prompts, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"프롬프트 설정 파일 저장 실패: {e}")
+    
+    def get_combined_prompt(self, prompt_type: str, jewelry_type: str) -> str:
+        """주얼리 타입에 맞게 조합된 프롬프트 반환"""
+        prompts_config = self.load_prompts_config()
+        
+        # 기본 프롬프트 가져오기
+        base_prompt = prompts_config.get("base_prompts", {}).get(prompt_type, "")
+        
+        # {JEWELRY_TYPE} 치환
+        combined_prompt = base_prompt.replace("{JEWELRY_TYPE}", jewelry_type)
+        
+        # 주얼리 타입별 추가 프롬프트 확인
+        jewelry_specific = prompts_config.get("jewelry_specific", {})
+        if jewelry_type in jewelry_specific:
+            type_prompts = jewelry_specific[jewelry_type]
+            if prompt_type in type_prompts:
+                combined_prompt += type_prompts[prompt_type]
+        
+        return combined_prompt
+    
+    def update_base_prompt(self, prompt_type: str, content: str):
+        """기본 프롬프트 업데이트"""
+        prompts_config = self.load_prompts_config()
+        if "base_prompts" not in prompts_config:
+            prompts_config["base_prompts"] = {}
+        prompts_config["base_prompts"][prompt_type] = content
+        self.save_prompts_config(prompts_config)
+    
+    def update_jewelry_specific_prompt(self, jewelry_type: str, prompt_type: str, content: str):
+        """주얼리 타입별 추가 프롬프트 업데이트"""
+        prompts_config = self.load_prompts_config()
+        if "jewelry_specific" not in prompts_config:
+            prompts_config["jewelry_specific"] = {}
+        if jewelry_type not in prompts_config["jewelry_specific"]:
+            prompts_config["jewelry_specific"][jewelry_type] = {}
+        prompts_config["jewelry_specific"][jewelry_type][prompt_type] = content
+        self.save_prompts_config(prompts_config)
+    
+    def get_jewelry_types_with_prompts(self) -> list:
+        """추가 프롬프트가 설정된 주얼리 타입 목록"""
+        prompts_config = self.load_prompts_config()
+        return list(prompts_config.get("jewelry_specific", {}).keys())
 
 
 # 전역 설정 관리자 인스턴스

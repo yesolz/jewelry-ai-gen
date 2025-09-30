@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog, 
     QCheckBox, QSpinBox, QGroupBox, QMessageBox,
-    QDialogButtonBox, QTextEdit
+    QDialogButtonBox, QTextEdit, QTabWidget,
+    QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView, QWidget
 )
 
 from ..config_manager import config_manager
@@ -28,6 +30,13 @@ class SettingsDialog(QDialog):
     
     def setup_ui(self):
         layout = QVBoxLayout()
+        
+        # 탭 위젯 생성
+        tab_widget = QTabWidget()
+        
+        # 기본 설정 탭
+        general_tab = QWidget()
+        general_layout = QVBoxLayout()
         
         # 작업 폴더 설정
         work_folder_group = QGroupBox("작업 폴더 설정")
@@ -61,7 +70,7 @@ class SettingsDialog(QDialog):
         work_folder_layout.addWidget(info_text)
         
         work_folder_group.setLayout(work_folder_layout)
-        layout.addWidget(work_folder_group)
+        general_layout.addWidget(work_folder_group)
         
         # API 키 설정
         api_group = QGroupBox("API 키 설정")
@@ -94,7 +103,7 @@ class SettingsDialog(QDialog):
         api_layout.addRow("상태:", self.api_status_label)
         
         api_group.setLayout(api_layout)
-        layout.addWidget(api_group)
+        general_layout.addWidget(api_group)
         
         # 모델 설정
         model_group = QGroupBox("모델 설정")
@@ -116,7 +125,7 @@ class SettingsDialog(QDialog):
         model_layout.addRow("출력 폴더:", self.default_out_line)
         
         model_group.setLayout(model_layout)
-        layout.addWidget(model_group)
+        general_layout.addWidget(model_group)
         
         # 처리 설정
         processing_group = QGroupBox("처리 설정")
@@ -134,7 +143,16 @@ class SettingsDialog(QDialog):
         processing_layout.addRow("자동 정리:", self.auto_archive_check)
         
         processing_group.setLayout(processing_layout)
-        layout.addWidget(processing_group)
+        general_layout.addWidget(processing_group)
+        
+        general_tab.setLayout(general_layout)
+        tab_widget.addTab(general_tab, "일반 설정")
+        
+        # 프롬프트 설정 탭
+        prompt_tab = self.create_prompt_tab()
+        tab_widget.addTab(prompt_tab, "프롬프트 설정")
+        
+        layout.addWidget(tab_widget)
         
         # 버튼
         button_layout = QHBoxLayout()
@@ -338,6 +356,216 @@ class SettingsDialog(QDialog):
         else:
             self.api_status_label.setText("API 키가 설정되었습니다")
             self.api_status_label.setStyleSheet("color: green;")
+    
+    def create_prompt_tab(self):
+        """프롬프트 설정 탭 생성"""
+        prompt_widget = QWidget()
+        layout = QVBoxLayout()
+        
+        # 프롬프트 타입 선택
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("프롬프트 타입:"))
+        self.prompt_type_combo = QComboBox()
+        self.prompt_type_combo.addItems([
+            "설명문 (desc)",
+            "연출컷 (styled)",
+            "착용컷 (wear)",
+            "클로즈업 (wear_closeup)",
+            "썸네일 (thumb)"
+        ])
+        self.prompt_type_combo.currentIndexChanged.connect(self.load_prompt)
+        type_layout.addWidget(self.prompt_type_combo)
+        type_layout.addStretch()
+        layout.addLayout(type_layout)
+        
+        # 기본 프롬프트 편집
+        prompt_group = QGroupBox("기본 프롬프트")
+        prompt_layout = QVBoxLayout()
+        
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setMinimumHeight(200)
+        prompt_layout.addWidget(self.prompt_edit)
+        
+        # 저장 버튼
+        save_btn_layout = QHBoxLayout()
+        save_btn_layout.addStretch()
+        self.save_prompt_btn = QPushButton("프롬프트 저장")
+        self.save_prompt_btn.clicked.connect(self.save_prompt)
+        save_btn_layout.addWidget(self.save_prompt_btn)
+        prompt_layout.addLayout(save_btn_layout)
+        
+        prompt_group.setLayout(prompt_layout)
+        layout.addWidget(prompt_group)
+        
+        # 주얼리별 추가 프롬프트
+        jewelry_group = QGroupBox("주얼리 타입별 추가 프롬프트")
+        jewelry_layout = QVBoxLayout()
+        
+        # 주얼리 타입 선택
+        jewelry_type_layout = QHBoxLayout()
+        jewelry_type_layout.addWidget(QLabel("주얼리 타입:"))
+        self.jewelry_type_combo = QComboBox()
+        self.jewelry_type_combo.addItems([
+            "ring",
+            "necklace",
+            "earring",
+            "bracelet",
+            "anklet",
+            "other"
+        ])
+        self.jewelry_type_combo.currentIndexChanged.connect(self.load_jewelry_prompts)
+        jewelry_type_layout.addWidget(self.jewelry_type_combo)
+        
+        # 새 타입 추가
+        self.new_type_line = QLineEdit()
+        self.new_type_line.setPlaceholderText("새 타입 추가...")
+        self.new_type_line.setMaximumWidth(150)
+        jewelry_type_layout.addWidget(self.new_type_line)
+        
+        self.add_type_btn = QPushButton("추가")
+        self.add_type_btn.clicked.connect(self.add_jewelry_type)
+        jewelry_type_layout.addWidget(self.add_type_btn)
+        
+        jewelry_type_layout.addStretch()
+        jewelry_layout.addLayout(jewelry_type_layout)
+        
+        # 추가 프롬프트 테이블
+        self.jewelry_prompts_table = QTableWidget(5, 2)
+        self.jewelry_prompts_table.setHorizontalHeaderLabels(["프롬프트 타입", "추가 내용"])
+        self.jewelry_prompts_table.setVerticalHeaderLabels([
+            "desc", "styled", "wear", "wear_closeup", "thumb"
+        ])
+        self.jewelry_prompts_table.horizontalHeader().setStretchLastSection(True)
+        self.jewelry_prompts_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        jewelry_layout.addWidget(self.jewelry_prompts_table)
+        
+        # 저장 버튼
+        jewelry_save_layout = QHBoxLayout()
+        jewelry_save_layout.addStretch()
+        self.save_jewelry_prompts_btn = QPushButton("추가 프롬프트 저장")
+        self.save_jewelry_prompts_btn.clicked.connect(self.save_jewelry_prompts)
+        jewelry_save_layout.addWidget(self.save_jewelry_prompts_btn)
+        jewelry_layout.addLayout(jewelry_save_layout)
+        
+        jewelry_group.setLayout(jewelry_layout)
+        layout.addWidget(jewelry_group)
+        
+        prompt_widget.setLayout(layout)
+        
+        # 초기 로드
+        self.load_prompt()
+        self.load_jewelry_prompts()
+        
+        return prompt_widget
+    
+    def get_prompt_type_key(self):
+        """현재 선택된 프롬프트 타입의 키 반환"""
+        type_map = {
+            0: "desc",
+            1: "styled",
+            2: "wear",
+            3: "wear_closeup",
+            4: "thumb"
+        }
+        return type_map.get(self.prompt_type_combo.currentIndex(), "desc")
+    
+    def load_prompt(self):
+        """선택된 프롬프트 로드"""
+        prompts_config = config_manager.load_prompts_config()
+        prompt_type = self.get_prompt_type_key()
+        
+        base_prompts = prompts_config.get("base_prompts", {})
+        content = base_prompts.get(prompt_type, "")
+        
+        self.prompt_edit.setPlainText(content)
+    
+    def save_prompt(self):
+        """기본 프롬프트 저장"""
+        prompt_type = self.get_prompt_type_key()
+        content = self.prompt_edit.toPlainText()
+        
+        config_manager.update_base_prompt(prompt_type, content)
+        
+        QMessageBox.information(
+            self,
+            "저장 완료",
+            f"{prompt_type} 프롬프트가 저장되었습니다."
+        )
+    
+    def load_jewelry_prompts(self):
+        """선택된 주얼리 타입의 추가 프롬프트 로드"""
+        prompts_config = config_manager.load_prompts_config()
+        jewelry_type = self.jewelry_type_combo.currentText()
+        
+        jewelry_specific = prompts_config.get("jewelry_specific", {})
+        type_prompts = jewelry_specific.get(jewelry_type, {})
+        
+        # 테이블 초기화
+        prompt_types = ["desc", "styled", "wear", "wear_closeup", "thumb"]
+        for i, prompt_type in enumerate(prompt_types):
+            # 타입명 표시 (읽기 전용)
+            type_item = QTableWidgetItem(prompt_type)
+            type_item.setFlags(type_item.flags() & ~Qt.ItemIsEditable)
+            self.jewelry_prompts_table.setItem(i, 0, type_item)
+            
+            # 추가 프롬프트
+            content = type_prompts.get(prompt_type, "")
+            self.jewelry_prompts_table.setItem(i, 1, QTableWidgetItem(content))
+    
+    def save_jewelry_prompts(self):
+        """주얼리별 추가 프롬프트 저장"""
+        jewelry_type = self.jewelry_type_combo.currentText()
+        prompt_types = ["desc", "styled", "wear", "wear_closeup", "thumb"]
+        
+        for i, prompt_type in enumerate(prompt_types):
+            item = self.jewelry_prompts_table.item(i, 1)
+            if item and item.text().strip():
+                config_manager.update_jewelry_specific_prompt(
+                    jewelry_type,
+                    prompt_type,
+                    item.text().strip()
+                )
+        
+        QMessageBox.information(
+            self,
+            "저장 완료",
+            f"{jewelry_type} 타입의 추가 프롬프트가 저장되었습니다."
+        )
+    
+    def add_jewelry_type(self):
+        """새 주얼리 타입 추가"""
+        new_type = self.new_type_line.text().strip().lower()
+        
+        if not new_type:
+            return
+        
+        # 이미 있는지 확인
+        for i in range(self.jewelry_type_combo.count()):
+            if self.jewelry_type_combo.itemText(i) == new_type:
+                QMessageBox.warning(
+                    self,
+                    "경고",
+                    f"'{new_type}'은(는) 이미 존재합니다."
+                )
+                return
+        
+        # 추가
+        self.jewelry_type_combo.addItem(new_type)
+        self.jewelry_type_combo.setCurrentText(new_type)
+        self.new_type_line.clear()
+        
+        # inbox 폴더 생성
+        work_folder = config_manager.get_work_folder()
+        if work_folder:
+            new_folder = work_folder / "inbox" / new_type
+            new_folder.mkdir(exist_ok=True)
+            
+            QMessageBox.information(
+                self,
+                "타입 추가 완료",
+                f"'{new_type}' 타입이 추가되었습니다.\n"
+                f"inbox/{new_type} 폴더가 생성되었습니다."
+            )
 
 
 class FirstRunDialog(QDialog):

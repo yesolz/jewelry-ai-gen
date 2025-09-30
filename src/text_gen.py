@@ -8,6 +8,7 @@ from pathlib import Path
 import openai
 
 from .config import get_config
+from .config_manager import config_manager
 
 
 logger = logging.getLogger(__name__)
@@ -15,15 +16,28 @@ logger = logging.getLogger(__name__)
 
 def load_prompt(prompt_name: str, jewelry_type: str) -> str:
     """프롬프트 파일 로드 및 변수 치환"""
+    # 새로운 프롬프트 시스템 사용
+    try:
+        combined_prompt = config_manager.get_combined_prompt(prompt_name, jewelry_type)
+        if combined_prompt:
+            return combined_prompt
+    except Exception as e:
+        logger.warning(f"프롬프트 설정 로드 실패, 기본 파일로 대체: {e}")
+    
+    # 기존 파일 시스템으로 폴백
     prompt_path = Path(__file__).parent / "prompts" / f"{prompt_name}.md"
     
-    with open(prompt_path, 'r', encoding='utf-8') as f:
-        prompt = f.read()
-    
-    # 주얼리 종류 치환
-    prompt = prompt.replace("{JEWELRY_TYPE}", jewelry_type)
-    
-    return prompt
+    if prompt_path.exists():
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            prompt = f.read()
+        
+        # 주얼리 종류 치환
+        prompt = prompt.replace("{JEWELRY_TYPE}", jewelry_type)
+        
+        return prompt
+    else:
+        logger.error(f"프롬프트 파일을 찾을 수 없음: {prompt_path}")
+        return f"# {jewelry_type} {prompt_name}"
 
 
 def generate_description(image_path: Path, jewelry_type: str) -> str:
