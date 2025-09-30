@@ -435,8 +435,23 @@ class SettingsDialog(QDialog):
         self.jewelry_prompts_table.setVerticalHeaderLabels([
             "desc", "styled", "wear", "wear_closeup", "thumb"
         ])
+        
+        # 테이블 크기 및 표시 설정 개선
         self.jewelry_prompts_table.horizontalHeader().setStretchLastSection(True)
         self.jewelry_prompts_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        
+        # 행 높이를 적당히 늘려서 텍스트가 잘 보이도록 (너무 크지 않게)
+        self.jewelry_prompts_table.verticalHeader().setDefaultSectionSize(60)
+        
+        # 첫 번째 열(프롬프트 타입) 너비 고정
+        self.jewelry_prompts_table.setColumnWidth(0, 120)
+        
+        # 텍스트 줄바꿈 허용
+        self.jewelry_prompts_table.setWordWrap(True)
+        
+        # 행 크기를 내용에 맞게 자동 조정
+        self.jewelry_prompts_table.resizeRowsToContents()
+        
         jewelry_layout.addWidget(self.jewelry_prompts_table)
         
         # 저장 버튼
@@ -510,7 +525,13 @@ class SettingsDialog(QDialog):
             
             # 추가 프롬프트
             content = type_prompts.get(prompt_type, "")
-            self.jewelry_prompts_table.setItem(i, 1, QTableWidgetItem(content))
+            content_item = QTableWidgetItem(content)
+            # 텍스트 줄바꿈 지원 및 세로 정렬
+            content_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
+            self.jewelry_prompts_table.setItem(i, 1, content_item)
+        
+        # 내용에 맞게 행 높이 자동 조정
+        self.jewelry_prompts_table.resizeRowsToContents()
     
     def save_jewelry_prompts(self):
         """주얼리별 추가 프롬프트 저장"""
